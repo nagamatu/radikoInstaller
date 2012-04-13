@@ -1,3 +1,0 @@
-com.gmail.nagamatu.radiko.installer.RadikoInstallerActivity -> com.gmail.nagamatu.radiko.installer.RadikoInstallerActivity:
-    void onCreate(android.os.Bundle) -> onCreate
-    android.app.Dialog onCreateDialog(int) -> onCreateDialog
