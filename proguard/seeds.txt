@@ -1,0 +1,21 @@
+com.gmail.nagamatu.radiko.installer.R$drawable: int ic_launcher
+com.gmail.nagamatu.radiko.installer.R$id: int dialog_text
+com.gmail.nagamatu.radiko.installer.R$id: int message
+com.gmail.nagamatu.radiko.installer.R$id: int passwd_dialog
+com.gmail.nagamatu.radiko.installer.R$id: int progress
+com.gmail.nagamatu.radiko.installer.R$id: int working
+com.gmail.nagamatu.radiko.installer.R$layout: int main
+com.gmail.nagamatu.radiko.installer.R$layout: int passwd
+com.gmail.nagamatu.radiko.installer.R$string: int app_name
+com.gmail.nagamatu.radiko.installer.R$string: int cancel
+com.gmail.nagamatu.radiko.installer.R$string: int check_account_passwd
+com.gmail.nagamatu.radiko.installer.R$string: int download_package
+com.gmail.nagamatu.radiko.installer.R$string: int error_download
+com.gmail.nagamatu.radiko.installer.R$string: int install_package
+com.gmail.nagamatu.radiko.installer.R$string: int login_google
+com.gmail.nagamatu.radiko.installer.R$string: int no_google_account
+com.gmail.nagamatu.radiko.installer.R$string: int ok
+com.gmail.nagamatu.radiko.installer.R$string: int password
+com.gmail.nagamatu.radiko.installer.R$string: int request_market
+com.gmail.nagamatu.radiko.installer.R$string: int select_account
+com.gmail.nagamatu.radiko.installer.RadikoInstallerActivity

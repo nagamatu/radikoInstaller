@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">radiko Installer</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="password">Password</string>
+    <string name="no_google_account">No Google Account Found</string>
+    <string name="select_account">Select Account</string>
+    <string name="error_download">Error on downloading</string>
+    <string name="check_account_passwd">Check account and password</string>
+    <string name="login_google">Login to google</string>
+    <string name="request_market">Request for Google Play</string>
+    <string name="download_package">Download package</string>
+    <string name="install_package">Install package</string>
+</resources>

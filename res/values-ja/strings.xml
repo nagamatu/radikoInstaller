@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">radikoインストーラ</string>
+    <string name="ok">了解</string>
+    <string name="cancel">キャンセル</string>
+    <string name="password">パスワード</string>
+    <string name="no_google_account">Googleアカウントが見つかりません</string>
+    <string name="select_account">アカウントを選択</string>
+    <string name="error_download">ダウンロードエラー</string>
+    <string name="check_account_passwd">アカウントとパスワードの確認</string>
+    <string name="login_google">Googleにログイン</string>
+    <string name="request_market">Google Playに要求</string>
+    <string name="download_package">パッケージのダウンロード</string>
+    <string name="install_package">パッケージのインストール</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/passwd_dialog"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:padding="10dp"
+    android:orientation="vertical" >
+
+    <EditText
+        android:id="@+id/dialog_text"
+        android:textSize="30sp"
+        android:lines="1"
+        android:hint="@string/password"
+        android:imeOptions="flagNoAccessoryAction|flagNoEnterAction"
+        android:inputType="textPassword|textNoSuggestions"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content" />
+
+</LinearLayout>
