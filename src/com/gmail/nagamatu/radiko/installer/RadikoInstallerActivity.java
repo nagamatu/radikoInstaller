@@ -96,7 +96,7 @@ public class RadikoInstallerActivity extends Activity {
     private static final Uri URI_GFS_SERVICE = Uri.parse(URL_GOOGLE_TALK_PROVIDER);
 
     private static String getDeviceId(Context context) {
-        String id = null;
+      String id = null;
       Cursor c = context.getContentResolver().query(URI_GFS_SERVICE, null, null, new String[] {"android_id" }, null);
       try {
           c.moveToFirst();
@@ -104,7 +104,9 @@ public class RadikoInstallerActivity extends Activity {
       } catch (Exception e) {
           e.printStackTrace();
       } finally {
-          c.close();
+          if (c != null) {
+              c.close();
+          }
       }
       return id;
     }
@@ -118,6 +120,10 @@ public class RadikoInstallerActivity extends Activity {
         RadikoX509TrustManager.allowAllSSL();
 
         mDeviceId = getDeviceId(this);
+        if (mDeviceId == null) {
+            updateMessage(R.string.error_download, "Device ID not found");
+            return;
+        }
 
         updateMessage(R.string.check_account_passwd, null);
         getEmailAndPasswd();
@@ -489,7 +495,7 @@ public class RadikoInstallerActivity extends Activity {
                     marketDa = m.group(1);
                 }
                 if (downloadUrl == null || marketDa == null) {
-                    updateMessage(R.string.error_download, "Missing Url or MarketDa");
+                    updateMessage(R.string.error_download, "Missing URL or MarketDA in response");
                     return;
                 }
                 updateMessage(R.string.download_package, null);
@@ -538,7 +544,7 @@ public class RadikoInstallerActivity extends Activity {
                     download2(con.getHeaderField("Location"), marketDa);
                     return;
                 }
-                updateMessage(R.string.error_download, "Wrong STATUS for download");
+                updateMessage(R.string.error_download, "Wrong response code for download");
             } catch (Exception e) {
                 updateMessage(R.string.error_download, e.toString());
             } finally {
