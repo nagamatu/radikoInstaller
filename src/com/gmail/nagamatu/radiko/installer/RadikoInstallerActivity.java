@@ -90,7 +90,7 @@ public class RadikoInstallerActivity extends Activity {
     private Account[] mAccounts;
     private Account mAccount;
     private String mPasswd;
-    
+
     private final Map<String,String> mLoginInfo = new HashMap<String,String>();
 
     private static final Uri URI_GFS_SERVICE = Uri.parse(URL_GOOGLE_TALK_PROVIDER);
@@ -162,7 +162,7 @@ public class RadikoInstallerActivity extends Activity {
 
         switch (mAccounts.length) {
             case 0:
-                Toast.makeText(this, getResources().getString(R.string.no_google_account), Toast.LENGTH_SHORT).show();
+                updateMessage(R.string.error_download, getResources().getString(R.string.no_google_account));
                 break;
             case 1:
                 mAccount = mAccounts[0];
