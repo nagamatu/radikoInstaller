@@ -16,7 +16,15 @@
 
 package com.gmail.nagamatu.radiko.installer;
 
-import org.apache.http.HttpException;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HTTP;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -37,7 +45,6 @@ import android.view.LayoutInflater;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -48,17 +55,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
-
-import javax.net.ssl.HttpsURLConnection;
 
 public class RadikoInstallerActivity extends Activity {
     private static final String URL_LOGIN = "https://www.google.com/accounts/ClientLogin";
@@ -67,7 +70,6 @@ public class RadikoInstallerActivity extends Activity {
     private static final String ACCOUNT_TYPE_HOSTED_OR_GOOGLE = "HOSTED_OR_GOOGLE";
     private static final String LOGIN_SERVICE = "androidsecure";
     private static final int PROTOCOL_VERSION = 2;
-    private static final String UTF_8 = "UTF-8";
     
     private static final Pattern PATTERN_URL = Pattern.compile("https?:\\/\\/[^:]+");
     private static final Pattern PATTERN_MARKETDA = Pattern.compile("MarketDA.*?(\\d+)");
@@ -85,7 +87,6 @@ public class RadikoInstallerActivity extends Activity {
 
     private static final String PACKAGE_NAME = "jp.radiko.Player";
 
-    private final Map<String,String> mParams = new HashMap<String,String>();
     private String mDeviceId;
     private Account[] mAccounts;
     private Account mAccount;
@@ -94,6 +95,8 @@ public class RadikoInstallerActivity extends Activity {
     private final Map<String,String> mLoginInfo = new HashMap<String,String>();
 
     private static final Uri URI_GFS_SERVICE = Uri.parse(URL_GOOGLE_TALK_PROVIDER);
+
+    private final HttpClient mClient = MySSLSocketFactory.getNewHttpClient();
 
     private static String getDeviceId(Context context) {
       String id = null;
@@ -116,8 +119,6 @@ public class RadikoInstallerActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
-
-        RadikoX509TrustManager.allowAllSSL();
 
         mDeviceId = getDeviceId(this);
         if (mDeviceId == null) {
@@ -246,30 +247,6 @@ public class RadikoInstallerActivity extends Activity {
         return super.onCreateDialog(id);
     }
 
-    private String getParamsStr() {
-        mParams.put(PARAMS_EMAIL, mAccount.name);
-        mParams.put(PARAMS_PASSWD, mPasswd);
-        mParams.put(PARAMS_SERVICE, LOGIN_SERVICE);
-        mParams.put(PARAMS_ACCOUNTTYPE, ACCOUNT_TYPE_HOSTED_OR_GOOGLE);
-
-        try {
-            final StringBuilder b = new StringBuilder();
-            for (String key: mParams.keySet()) {
-                if (b.length() != 0) {
-                    b.append("&");
-                }
-                b.append(URLEncoder.encode(key, UTF_8));
-                b.append("=");
-                b.append(URLEncoder.encode(mParams.get(key), UTF_8));
-            }
-            return b.toString();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return null;
-    }
-
     private static String streamToString(InputStream resultStream) throws IOException {
         final BufferedReader reader = new java.io.BufferedReader(
                 new java.io.InputStreamReader(resultStream));
@@ -283,58 +260,40 @@ public class RadikoInstallerActivity extends Activity {
         
     }
 
+    private List<NameValuePair> getParams() {
+        final List<NameValuePair> params = new ArrayList<NameValuePair>(4);
+        params.add(new BasicNameValuePair(PARAMS_EMAIL, mAccount.name));
+        params.add(new BasicNameValuePair(PARAMS_PASSWD, mPasswd));
+        params.add(new BasicNameValuePair(PARAMS_SERVICE, LOGIN_SERVICE));
+        params.add(new BasicNameValuePair(PARAMS_ACCOUNTTYPE, ACCOUNT_TYPE_HOSTED_OR_GOOGLE));
+        return params;
+    }
+
     private void login() {
         try {
-            final URL url = new URL(URL_LOGIN);
-            final HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
-            try {
-                con.setDoInput(true);
-                con.setDoOutput(true);
-                con.addRequestProperty("Content-type", "application/x-www-form-urlencoded");
-
-                OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream(), UTF_8);
-                writer.write(getParamsStr());
-                writer.flush();
-                writer.close();
-
-                int errorCode = con.getResponseCode();
-                if (errorCode >= 400) {
-                    InputStream errorStream = con.getErrorStream();
-                    try {
-                        updateMessage(R.string.error_download, con.getResponseMessage());
-                        final String errorData = streamToString(errorStream);
-                        RadikoInstallerActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(RadikoInstallerActivity.this, errorData, Toast.LENGTH_SHORT).show();
-                            }                            
-                        });
-                        throw new HttpException(errorData);
-                    } finally {
-                        errorStream.close();
-                    }
-                }
-
-                InputStream in = con.getInputStream();
-                try {
-                    final DataInputStream din = new DataInputStream(in);
-                    String line;
-                    while ((line = din.readLine()) != null) {
-                        mLoginInfo.clear();
-                        final String ss[] = line.split("=");
-                        mLoginInfo.put(ss[0], ss[1]);
-                    }
-                } finally {
-                    in.close();
-                }
-                
-                updateMessage(R.string.request_market, null);
-                apiRequest();
-            } catch (Exception e) {
-                updateMessage(R.string.error_download, e.toString());
-            } finally {
-                con.disconnect();
+            final HttpPost request = new HttpPost(URL_LOGIN);
+            request.addHeader("Content-type", "application/x-www-form-urlencoded");
+            request.setEntity(new UrlEncodedFormEntity(getParams(), HTTP.UTF_8));
+            final HttpResponse response = mClient.execute(request);
+            final HttpEntity entity = response.getEntity();
+            if (response.getStatusLine().getStatusCode() >= 400) {
+                updateMessage(R.string.error_download, response.getStatusLine().getReasonPhrase());
+                return;
             }
+            final InputStream in = entity.getContent();
+            try {
+                final DataInputStream din = new DataInputStream(in);
+                String line;
+                while ((line = din.readLine()) != null) {
+                    mLoginInfo.clear();
+                    final String ss[] = line.split("=");
+                    mLoginInfo.put(ss[0], ss[1]);
+                }
+            } finally {
+                in.close();
+            }
+            updateMessage(R.string.request_market, null);
+            apiRequest();
         } catch (Exception e) {
             updateMessage(R.string.error_download, e.toString());
         }
@@ -443,68 +402,46 @@ public class RadikoInstallerActivity extends Activity {
 
     private void apiRequest() {
         try {
-            final URL url = new URL(URL_DOWNLOAD);
-            final HttpsURLConnection con = (HttpsURLConnection)url.openConnection();
-            try {
-                con.setDoInput(true);
-                con.setDoOutput(true);
-                con.addRequestProperty("Content-type", "application/x-www-form-urlencoded");
-                con.addRequestProperty("User-Agent", "Android-Market/2");
-                con.addRequestProperty("Cookie", "ANDROIDSECURE=" + mLoginInfo.get("Auth"));
+            final HttpPost request = new HttpPost(URL_DOWNLOAD);
+            request.addHeader("Content-type", "application/x-www-form-urlencoded");
+            request.addHeader("User-Agent", "Android-Market/2");
+            request.addHeader("Cookie", "ANDROIDSECURE=" + mLoginInfo.get("Auth"));
 
-                String request64 = Base64.encodeToString(createRequest(), Base64.URL_SAFE);
-                String requestData = "version=" + PROTOCOL_VERSION + "&request="+request64;
+            final List<NameValuePair> params = new ArrayList<NameValuePair>(4);
+            params.add(new BasicNameValuePair("version", String.valueOf(PROTOCOL_VERSION)));
+            String request64 = Base64.encodeToString(createRequest(), Base64.URL_SAFE);
+            params.add(new BasicNameValuePair("request", request64));
 
-                OutputStreamWriter writer = new OutputStreamWriter(con.getOutputStream(), UTF_8);
-                writer.write(requestData);
-                writer.flush();
-                writer.close();
-
-                int errorCode = con.getResponseCode();
-                if (errorCode >= 400) {
-                    InputStream errorStream = con.getErrorStream();
-                    try {
-                        updateMessage(R.string.error_download, con.getResponseMessage());
-                        final String errorData = streamToString(errorStream);
-                        RadikoInstallerActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(RadikoInstallerActivity.this, errorData, Toast.LENGTH_SHORT).show();
-                            }                            
-                        });
-                        throw new HttpException(errorData);
-                    } finally {
-                        errorStream.close();
-                    }
-                }
-
-                String downloadUrl = null;
-                String marketDa = null;
-                final InputStream in = con.getInputStream();
-                final GZIPInputStream zis = new GZIPInputStream(new BufferedInputStream(in));
-
-                // Response is in ProtBuf format. But use a easy way to extract string here
-                final String response = streamToString(zis);
-                Matcher m = PATTERN_URL.matcher(response);
-                if (m.find()) {
-                    downloadUrl = m.group();
-                }
-
-                m = PATTERN_MARKETDA.matcher(response);
-                if (m.find()) {
-                    marketDa = m.group(1);
-                }
-                if (downloadUrl == null || marketDa == null) {
-                    updateMessage(R.string.error_download, "Missing URL or MarketDA in response");
-                    return;
-                }
-                updateMessage(R.string.download_package, null);
-                download(downloadUrl, marketDa);
-            } catch (Exception e) {
-                updateMessage(R.string.error_download, e.toString());
-            } finally {
-                con.disconnect();
+            request.setEntity(new UrlEncodedFormEntity(params, HTTP.UTF_8));
+            final HttpResponse response = mClient.execute(request);
+            final HttpEntity entity = response.getEntity();
+            if (response.getStatusLine().getStatusCode() >= 400) {
+                updateMessage(R.string.error_download, response.getStatusLine().getReasonPhrase());
+                return;
             }
+
+            String downloadUrl = null;
+            String marketDa = null;
+            final InputStream in = entity.getContent();
+            final GZIPInputStream zis = new GZIPInputStream(new BufferedInputStream(in));
+
+            // Response is in ProtBuf format. But use a easy way to extract string here
+            final String resString = streamToString(zis);
+            Matcher m = PATTERN_URL.matcher(resString);
+            if (m.find()) {
+                downloadUrl = m.group();
+            }
+
+            m = PATTERN_MARKETDA.matcher(resString);
+            if (m.find()) {
+                marketDa = m.group(1);
+            }
+            if (downloadUrl == null || marketDa == null) {
+                updateMessage(R.string.error_download, "Missing URL or MarketDA in response");
+                return;
+            }
+            updateMessage(R.string.download_package, null);
+            download(downloadUrl, marketDa);
         } catch (Exception e) {
             updateMessage(R.string.error_download, e.toString());
         }
@@ -512,117 +449,49 @@ public class RadikoInstallerActivity extends Activity {
 
     private void download(String urlstr, String marketDa) {
         try {
-            final URL url = new URL(urlstr);
+            final HttpGet request = new HttpGet(urlstr);
+            request.addHeader("User-Agent", "Android-Market/2");
+            request.addHeader("Cookie", "MarketDA=" + marketDa);
 
-            final HttpsURLConnection con = (HttpsURLConnection)url.openConnection();
+            final HttpResponse response = mClient.execute(request);
+            if (response.getStatusLine().getStatusCode() != 200) {
+                updateMessage(R.string.error_download, response.getStatusLine().getReasonPhrase());
+                return;
+            }
+
+            final File file = new File(Environment.getExternalStorageDirectory(), PACKAGE_NAME + ".apk");
+            if (file.exists()) {
+                file.delete();
+            }
+            final FileOutputStream out = new FileOutputStream(file);
+            final InputStream in = response.getEntity().getContent();
+            long total = response.getEntity().getContentLength();
+            long len = total;
             try {
-                con.setDoInput(true);
-                con.setDoOutput(false);
-                con.addRequestProperty("User-Agent", "Android-Market/2");
-                con.addRequestProperty("Cookie", "MarketDA=" + marketDa);
-                con.connect();
- 
-                int errorCode = con.getResponseCode();
-                if (errorCode >= 400) {
-                    updateMessage(R.string.error_download, con.getResponseMessage());
-                    InputStream errorStream = con.getErrorStream();
-                    try {
-                        final String errorData = streamToString(errorStream);
-                        RadikoInstallerActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(RadikoInstallerActivity.this, errorData, Toast.LENGTH_SHORT).show();
-                            }              
-                        });
-                        throw new HttpException(errorData);
-                    } finally {
-                        errorStream.close();
+                final byte[] buf = new byte[BUFSIZE];
+                while (len > 0) {
+                    int rsz = in.read(buf);
+                    if (rsz < 0) {
+                        break;
                     }
+                    out.write(buf, 0, rsz);
+                    len -= rsz;
+                    updateProgress((int)(100 * (total - len) / total));
                 }
-                
-                if (errorCode == 302) {
-                    download2(con.getHeaderField("Location"), marketDa);
+                if (len != 0) {
+                    updateMessage(R.string.error_download, "Insufficient Response");
                     return;
                 }
-                updateMessage(R.string.error_download, "Wrong response code for download");
-            } catch (Exception e) {
-                updateMessage(R.string.error_download, e.toString());
+
+                updateMessage(R.string.install_package, null);
+                final Intent intent = new Intent(Intent.ACTION_VIEW); 
+                intent.setDataAndType(Uri.fromFile(file),  "application/vnd.android.package-archive"); 
+                startActivity(intent);
+                finish();
             } finally {
-                con.disconnect();
-            }
-        } catch (Exception e) {
-            updateMessage(R.string.error_download, e.toString());
-        }
-    }
-    
-    private void download2(String urlstr, String marketDa) {
-        try {
-            final URL url = new URL(urlstr);
-
-            final HttpURLConnection con = (HttpURLConnection)url.openConnection();
-            try {
-                con.setDoInput(true);
-                con.setDoOutput(false);
-                con.addRequestProperty("User-Agent", "Android-Market/2");
-                con.addRequestProperty("Cookie", "MarketDA=" + marketDa);
-                con.connect();
- 
-                int errorCode = con.getResponseCode();
-                if (errorCode >= 400) {
-                    updateMessage(R.string.error_download, con.getResponseMessage());
-                    InputStream errorStream = con.getErrorStream();
-                    try {
-                        final String errorData = streamToString(errorStream);
-                        RadikoInstallerActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(RadikoInstallerActivity.this, errorData, Toast.LENGTH_SHORT).show();
-                            }                            
-                        });
-                        throw new HttpException(errorData);
-                    } finally {
-                        errorStream.close();
-                    }
-                }
-
-                final File file = new File(Environment.getExternalStorageDirectory(), PACKAGE_NAME + ".apk");
-                if (file.exists()) {
-                    file.delete();
-                }
-                final FileOutputStream out = new FileOutputStream(file);
-                InputStream in = con.getInputStream();
-                int total = con.getContentLength();
-                int len = total;
-                try {
-                    final byte[] buf = new byte[BUFSIZE];
-                    while (len > 0) {
-                        int rsz = in.read(buf);
-                        if (rsz < 0) {
-                            break;
-                        }
-                        out.write(buf, 0, rsz);
-                        len -= rsz;
-                        updateProgress(100 * (total - len) / total);
-                    }
-                    if (len != 0) {
-                        updateMessage(R.string.error_download, "Insufficient Response");
-                        return;
-                    }
-
-                    updateMessage(R.string.install_package, null);
-                    final Intent intent = new Intent(Intent.ACTION_VIEW); 
-                    intent.setDataAndType(Uri.fromFile(file),  "application/vnd.android.package-archive"); 
-                    startActivity(intent);
-                    finish();
-                } finally {
-                    in.close();
-                    out.flush();
-                    out.close();
-                }
-            } catch (Exception e) {
-                updateMessage(R.string.error_download, e.toString());
-            } finally {
-                con.disconnect();
+                in.close();
+                out.flush();
+                out.close();
             }
         } catch (Exception e) {
             updateMessage(R.string.error_download, e.toString());
